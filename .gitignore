@@ -1,6 +1,5 @@
 
 
-directory.txt
 .class
 .classpath
 .project
@@ -54,3 +53,5 @@ local.properties
 .scala_dependencies
 .worksheet
 
+Basic Data Analysis/directory.txt
+*.class
