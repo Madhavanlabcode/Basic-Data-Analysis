@@ -2,9 +2,6 @@ package util.fileops;
 
 import image.ImageEditing;
 
-//Added vectors to store previous versions of zooms
-import java.util.Vector;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -14,6 +11,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
@@ -34,9 +32,6 @@ public class Layer  extends MapRectCoordSystem{
 	public double[][] data;
 	private double mean;
 	
-	//Added a vector for storing previous zooms
-	public Vector<double[][]> prevZooms;
-	
 	public double lineTime = 0; //Nanonis only; not saved in the file.
 	
 	public boolean fileIsComplete = true;
@@ -54,9 +49,6 @@ public class Layer  extends MapRectCoordSystem{
 		this.v = v;
 		this.current = current;
 		this.mean = FieldOps.mean(data);
-		
-		//Added
-		this.prevZooms= new Vector();
 	}
 	public int getByteLength()
 	{
@@ -67,34 +59,7 @@ public class Layer  extends MapRectCoordSystem{
 		l += 16; //for the origin
 		return l;
 	}
-	////////////////////////////////////////////////////////
-	public void zoomIn(){
-		String inputCoord=JOptionPane.showInputDialog("Enter the Coordinates of Upper Left Corner of Zoom separated by a comma");
-		String[] pair=inputCoord.split(",");
-		int xStart=Integer.parseInt(pair[0].trim());
-		int yStart=Integer.parseInt(pair[1].trim());
-		String inputZoom=JOptionPane.showInputDialog("Enter the final size of the Zoom square in pixels ");
-		int zoomSize=Integer.parseInt(inputZoom.trim());
-		
-		if((xStart+zoomSize)>(this.nx-1) || (yStart+zoomSize)>(this.ny - 1)){
-			System.out.println("Your zoom is out of the bounds of the image");
-		}
-		else{
-			prevZooms.addElement(this.data);
-			double[][] tempdata= new double[zoomSize][zoomSize];
-			for(int i=xStart; i<(xStart+zoomSize); i++){
-				for(int j=yStart; j<(yStart+zoomSize); j++){
-					System.out.println(xStart + yStart + zoomSize);
-					tempdata[i-xStart][j-yStart]=data[i][j];
-				}
-			}
-			this.data=tempdata;
-		}
-		
-	}
 	
-	
-	////////////////////////////////////////////////////////
 	//This method accomplishes the 0.5 pixel shift which is in FieldOps.getValueAt().
 	public double evaluateAt(double[] pixPt)
 	{
@@ -175,7 +140,6 @@ public class Layer  extends MapRectCoordSystem{
 	{
 		return new PointSpectra(FieldOps.transpose(data), x, y, new double [y.length]);
 	}
-	
 	public static void writeBIN(Layer t, String filepath)
 	{
 		File file = new File(filepath);
@@ -228,7 +192,6 @@ public class Layer  extends MapRectCoordSystem{
 		double[] x = null, y = null;
 		double v = 0, current = 0;
 		double[][] data = null;
-		double[] origin = new double[2];
 		File file = new File(filepath);
 		Topomap.putStdDir(file.getParent() + "\\");
 		FileInputStream inf = null;
@@ -247,7 +210,24 @@ public class Layer  extends MapRectCoordSystem{
 		try {
 			nx = ind.readInt();
 			ny = ind.readInt();
-			v = ind.readDouble();
+			
+			//read 8 bytes: if the first 4 bytes are an int with length 1:
+			//open only layer of topomap as a Layer
+			//else continue as if it's a Layer
+			byte[] testBytes = new byte[8];
+			for(int i=0;i<8;i++){
+				testBytes[i]=ind.readByte();
+			}
+			
+			if(ByteBuffer.wrap(testBytes).getInt()==1){
+				System.out.println("Opening single-layer Topomap as Layer");
+				ind.close();
+				inbuff.close();
+				inf.close();
+				Topomap t1=Topomap.readBIN(filepath);
+				return t1.getLayer(0);
+			}
+			v = ByteBuffer.wrap(testBytes).getDouble();
 			current = ind.readDouble();
 			x = new double[nx]; y = new double [ny];
 			data = new double [nx][ny];
@@ -344,8 +324,10 @@ public class Layer  extends MapRectCoordSystem{
 				Layer[] m = NanonisFileOps.loadLayerFromScan(fullpath.toString(), true);
 				return m[o];
 			}
-			else if (fullpath.toString().endsWith(".bmp"))
+			else if (fullpath.toString().endsWith(".bmp")){
+				System.out.println("Opening layer from image");
 				return Layer.getFreeLayer(ImageEditing.getFromImage(ImageEditing.open(fullpath.toString())));
+			}
 			else;
 		
 		return null;

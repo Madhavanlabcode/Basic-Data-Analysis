@@ -556,7 +556,7 @@ public class ImageEditing {
 				b = c.getBlue();
 				ans[i][j] = r+g+b;
 			}
-		
+		System.out.println("loaded image data");
 	return ans;
 		
 	}
