@@ -619,10 +619,10 @@ public class NanonisFileOps {
 			FieldOps.rotatePlus90(topo);
 			FieldOps.putTranspose(topo);
 		}
-		if (angle != 180){
-			ArrayOps.flipY(topo);
-			ArrayOps.flip(y);
-		}
+//		if (angle != 180){
+//			ArrayOps.flipY(topo);
+//			ArrayOps.flip(y);
+//		}
 		if (fileNotFull) FieldOps.changeZeroToAverage(topo);
 		//if the voltage is flipped, flip it
 		if (v[v.length-1] < v[0])

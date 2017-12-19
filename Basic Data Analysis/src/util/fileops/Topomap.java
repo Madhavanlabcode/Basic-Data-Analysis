@@ -249,7 +249,6 @@ public class Topomap extends MapRectCoordSystem{
 		double[] x = null, y = null, v = null;
 		double[][][] data = null;
 		String[] names = null;
-		double[] origin = new double[2];
 		File file = new File(filepath);
 		putStdDir(file.getParent() + "\\");
 		FileInputStream inf = null;
@@ -269,8 +268,17 @@ public class Topomap extends MapRectCoordSystem{
 		try {
 			nx = ind.readInt();
 			ny = ind.readInt();
+			//if nLayers reasonable, proceed, if not, assume Layer format
 			nlayers = ind.readInt();
-			System.out.println(nx);
+			if(nlayers>256 || nlayers<1){
+				System.out.println("nLayers>256, trying as layer");
+				ind.close();
+				inbuff.close();
+				inf.close();
+				Layer[] lays = {Layer.readBIN(filepath)};
+				return Topomap.newTopomap(lays);
+			}
+			
 			x = new double[nx]; y = new double [ny]; v = new double [nlayers];
 			data = new double [nlayers][nx][ny];
 			names = new String[nlayers];
@@ -289,7 +297,6 @@ public class Topomap extends MapRectCoordSystem{
 			System.out.println();
 			for (int i = 0; i < nlayers; i++){
 				temp = ind.readInt();
-				System.out.println(temp);
 				names[i] = "";
 				for (int j = 0; j < temp; j++)
 					names[i] += ind.readChar();
