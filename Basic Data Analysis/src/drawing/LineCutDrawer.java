@@ -1,13 +1,16 @@
 package drawing;
 
 
-import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Dimension;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 
 import util.ArrayOps;
@@ -21,7 +24,7 @@ import util.fileops.Layer;
 import util.fileops.PointSpectra;
 import util.fileops.Topomap;
 
-public class LineCutDrawer implements KeyStrokeProccessor {
+public class LineCutDrawer extends JFrame implements KeyStrokeProccessor {
 	
 	
 	GraphDrawerCart g;
@@ -31,7 +34,7 @@ public class LineCutDrawer implements KeyStrokeProccessor {
 	double[][][] dataset;
 	double[] mean;
 	int nspec;
-	public JFileChooser fc;
+	public JFileChooser fc = new JFileChooser(Topomap.stddir);;
 	
 	double dh; //height offset.
 	double oldDH; //in case of drawing an image, dh will go to zero. 
@@ -51,6 +54,8 @@ public class LineCutDrawer implements KeyStrokeProccessor {
 	private double[] tempx, tempy;
 	
 	Color def = Color.RED;
+	
+	JMenuBar menuBar;
 	
 	public LineCutDrawer(Topomap t, int nspec, double[][] line)
 	{
@@ -73,6 +78,30 @@ public class LineCutDrawer implements KeyStrokeProccessor {
 		g = new GraphDrawerCart("Line Cut Viewer", true);
 		setUpDrawer();
 		g.showWindow();
+		
+		//Setting up menu bar
+		menuBar = new JMenuBar();
+		
+	    // File Menu, F - Mnemonic
+	    JMenu fileMenu = new JMenu("File");
+	    fileMenu.setMnemonic(KeyEvent.VK_F);
+	    menuBar.add(fileMenu);
+		
+	    //File->Save data as csv
+	    JMenuItem saveAsCsvMI = new JMenuItem("Save as comma-separated text file");
+	    fileMenu.add(saveAsCsvMI);
+	    class saveAsCsvAL implements ActionListener{
+	    	double[][] data;
+	    	saveAsCsvAL(double[][] dataPrime){
+	    		data=dataPrime;
+	    	}
+	    	public void actionPerformed(ActionEvent e){
+	    		ColumnIO.writeTableCSV(data, FileOps.selectSave(fc).toString());
+	    	}
+	    }
+	    saveAsCsvMI.addActionListener(new saveAsCsvAL(spec));
+	    
+	    setJMenuBar(menuBar);
 	}
 	public LineCutDrawer(PointSpectra t)
 	{
@@ -151,8 +180,7 @@ public class LineCutDrawer implements KeyStrokeProccessor {
 	}
 	public void setDefaultDH()
 	{
-		//2015.11.18 added factor of 2
-		dh = 2*(ArrayOps.max(spec) - ArrayOps.min(spec))/nspec;
+		dh = (ArrayOps.max(spec) - ArrayOps.min(spec))/nspec;
 	}
 	public void evaluateSpec()
 	{
@@ -174,7 +202,6 @@ public class LineCutDrawer implements KeyStrokeProccessor {
 		double max = ArrayOps.max(offsetSpec), min = ArrayOps.min(offsetSpec);
 		
 		g.setNumPlots(nspec);
-		//Draw the spectra across the line cut
 		for (int i = 0; i < nspec; i++)
 		{
 			g.setXY(new GraphDrawerCart.GraphObject(x, offsetSpec[i]), false, false, i);
@@ -218,7 +245,7 @@ public class LineCutDrawer implements KeyStrokeProccessor {
 		if (ch == 'n') {
 			this.changeNspec(Integer.parseInt(JOptionPane.showInputDialog("Enter the desired number of spectra")));
 		}
-		if (ch == 'w'){
+		if (ch == 't'){
 			this.dh = Double.parseDouble(JOptionPane.showInputDialog("Enter the desired offset in 'arbitrary units'. \r\n Current value = " + dh + "."));
 			setOffsetSpec();
 			double max = ArrayOps.max(offsetSpec), min = ArrayOps.min(offsetSpec);
@@ -300,27 +327,6 @@ public class LineCutDrawer implements KeyStrokeProccessor {
 		else setDefaultDH();//dh = oldDH;
 		refresh();
 	}
-	
-	public void pullLegend()
-	{
-		JFrame legend = new JFrame("Options");
-		JLabel textLabel = new JLabel("<html> Options: <br/>"
-				+ " <br/>"
-				+ "n - change the number of spectra in the cut <br/>"
-				+ "w - change the offset between plots <br/>"
-				+ "i - toggle between thin/thick lines <br/>"
-				+ "v - save everything as txt tab-separated <br/>"
-				+ "V - save everything as BIN <br/>"
-				+ " <br/>"
-				+ " </html>"
-				);
-		textLabel.setPreferredSize(new Dimension(350,200));
-		legend.getContentPane().add(textLabel, BorderLayout.CENTER);
-		legend.setLocation(1000, 200);
-		legend.pack();
-		legend.setVisible(true);
-     }
-	
 	public static void main(String[] args)
 	{
 		Topomap.setStdDir();

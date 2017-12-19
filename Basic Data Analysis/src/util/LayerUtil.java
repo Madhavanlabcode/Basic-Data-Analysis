@@ -532,6 +532,41 @@ public class LayerUtil {
 
 		return ans[2];
 	}
+	
+	public static double[][] symmetrizeFFTTwofold(Layer t, boolean log) {
+		double meanTemp = 0;
+		if (!log) {
+			meanTemp = FieldOps.mean(t.data);
+			FieldOps.plusEquals(t.data, -meanTemp);
+		}
+		double[][] fftmag = FFTOps.obtainFFTmagCent(t.data);
+		
+		double[][][] ans = new double [3][t.nx][t.ny];
+		ans[0]=fftmag;
+		ans[1] = FieldOps.rotatePlus90_aboutPixel(ans[0], t.nx/2, t.ny/2);
+		ans[1] = FieldOps.rotatePlus90_aboutPixel(ans[1], t.nx/2, t.ny/2);
+		FieldOps.add(ans[0], ans[1], ans[2]);
+
+//		FieldOps.log(fftmag);
+//		FieldOps.log(reflection[0]);
+//		FieldOps.log(reflection[1]);
+//		FieldOps.log(ans[0]);
+//		FieldOps.log(ans[2]);
+//		String s = FileOps.selectSave(fc).toString();
+//		SRAW.writeImage(s + "orig", fftmag);
+//		SRAW.writeImage(s + "refl_1", reflection[0]);
+//		SRAW.writeImage(s + "refl_2", reflection[1]);
+//		SRAW.writeImage(s + "avg_1", ans[0]);
+//		SRAW.writeImage(s + "final_answer", ans[2]);
+//				FileOps.writeImage(fc, fftmag);
+//		FileOps.writeImage(fc, reflection[0]);
+//		FileOps.writeImage(fc, reflection[1]);
+		if (log) FieldOps.log(ans[2]);
+		else FieldOps.plusEquals(t.data, meanTemp);
+
+		return ans[2];
+	}
+	
 	/**
 	 * This method is for triangular lattices where 3 Bragg peaks are equally visible.
 	 * It is not to be assumed that they form a perfect hexagon. The hexagon is formed in the method itself.
@@ -1392,5 +1427,7 @@ public class LayerUtil {
 			return ans;
 		}
 	}
+
+
 	
 }

@@ -4,8 +4,6 @@ import image.GifSequenceWriter;
 import image.ImageEditing;
 import impurity.PointImp;
 
-//Added a library to get the screen dimensions
-import java.awt.Toolkit;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -177,11 +175,10 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 			zoomFactor *= 2;
 			imageOverField /= 2;
 		}
-		//Changed to have size ratios other than 2^n
-		while (sizeratio*sx < defaultSize)
+		while (sizeratio*sx < defaultSize && sizeratio*sx*2 <= defaultSize)
 		{
-			sizeratio++;
-			imageOverField++;
+			sizeratio*=2;
+			imageOverField *= 2;
 		}
 		
 		writepoint[0] = ox + sizeratio*sx + 50;
@@ -220,7 +217,6 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 	    	}
 	    }
 	    saveAsBinMI.addActionListener(new saveAsBinAL(t));
-	   
 	    
 	    //File->Save layer as csv
 	    JMenuItem saveAsCsvMI = new JMenuItem("Save as comma-separated text file");
@@ -275,6 +271,23 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 	    	}
 	    }
 	    saveAsTextTableMI.addActionListener(new saveAsTextTableAL(t));
+	    
+	    //File->merge layers to topomap
+	    JMenuItem mergeToMapMI = new JMenuItem("Merge layers into a topomap");
+	    fileMenu.add(mergeToMapMI);
+	    class mergeToMapAL implements ActionListener{
+	    	mergeToMapAL(){}
+	    	public void actionPerformed(ActionEvent e) {
+	    		String input = JOptionPane.showInputDialog("Enter the number of layers");
+				int numLay = Integer.parseInt(input);
+				Layer[] lays = new Layer[numLay];
+				for(int x=0;x<numLay;x++){
+		    		lays[x]=Layer.openFree(fc);
+				}
+				new TopomapViewer(Topomap.newTopomap(lays),dir,size);
+	    	}
+	    }
+	    mergeToMapMI.addActionListener(new mergeToMapAL());
 	    
 	    //File->Copy current image to clipboard
         JMenuItem toClipMI = new JMenuItem("Copy current image to clipboard");
@@ -559,6 +572,22 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
         }
     	viewTwoImpsMI.addActionListener(new viewTwoImpsAL());
     	
+    	//Selection->Use mask bitmap to split layer into two
+        JMenuItem maskLayerMI = new JMenuItem("Use mask (bitmap or Layer) to split layer into two");
+        selectionMenu.add(maskLayerMI);
+        class maskLayerAL implements ActionListener{
+        	Layer t;
+        	maskLayerAL(Layer tPrime){
+        		t=tPrime;
+        	}
+        	public void actionPerformed(ActionEvent e){
+        		Layer spf = Layer.openFree(fc);
+    			new LayerViewer(Layer.newLayer(t, FieldOps.spatialFilter(t.data, spf.data)), dir, defaultSize);
+    			new LayerViewer(Layer.newLayer(t, FieldOps.spatialFilter(t.data, ArrayOps.subtract(ArrayOps.max(spf.data),spf.data))), dir, defaultSize);
+        	}
+        }
+        maskLayerMI.addActionListener(new maskLayerAL(t));
+    	
         //Analysis menu
         JMenu analysisMenu = new JMenu("Analysis");
         menuBar.add(analysisMenu);
@@ -697,7 +726,7 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
     			if (sectionDrawer == null)
     			{	
     				if (line == null) line = new double[][] {{0, 0}, {t.nx, t.ny}};
-    				sectionDrawer = new LayerCutDrawer(thisViewer, 128, line);
+    				sectionDrawer = new LayerCutDrawer(thisViewer, 2, line);
     				sectionDrawer.setFC(fc);
     			}
     			else {
@@ -710,31 +739,9 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
         }
         lineCutMI.addActionListener(new lineCutAL(t,this));
         
-        ///////////////////////////////////////////////////////////////////////////
-        //File-> Save line cut to a txt file
-        JMenuItem saveCutasTxtMI = new JMenuItem("Save line cut as tab separated text file");
-        analysisMenu.add(saveCutasTxtMI);
-        class saveCutasTxtAL implements  ActionListener{
-        	LayerViewer lv;
-        	saveCutasTxtAL(LayerViewer lvPrime){
-        		lv=lvPrime;
-        	}
-        	public void actionPerformed(ActionEvent e){
-        		//if we have created a sectionDrawer for the line cut and the spectra have the correct
-        		//length, the create a 2xN array of the x and y values of the line cut
-        		if(line !=null){
-        			//sectionDrawer= new LayerCutDrawer(lv, 128, line);
-        			ColumnIO.writeTwoColumnsTxt(lv.sectionDrawer.s, lv.sectionDrawer.spec, FileOps.selectSave(fc).toString());
-        		}
-        	}
-        }
-        saveCutasTxtMI.addActionListener(new saveCutasTxtAL(this));
-        ///////////////////////////////////////////////////////////////////////////////////
-        
-        
         //Analysis->bin the layer and get a histogram of impurity concentration
         JMenuItem impConcentrationMI = new JMenuItem("Histogram of impurity concentration in bins");
-        analysisMenu.add(lineCutMI);
+        analysisMenu.add(impConcentrationMI);
         class impConcentrationAL implements ActionListener{
         	Layer t;
         	impConcentrationAL(Layer tPrime){
@@ -774,6 +781,53 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
         	}
         }
         impConcentrationMI.addActionListener(new impConcentrationAL(t));
+        
+        //Analysis->bin the layer and get a histogram of impurity concentration
+        JMenuItem radialAvgMI = new JMenuItem("Save the radial average ");
+        analysisMenu.add(radialAvgMI);
+        class radialAvgAL implements ActionListener{
+        	Layer t;
+        	radialAvgAL(Layer tPrime){
+        		t=tPrime;
+        	}
+        	public void actionPerformed(ActionEvent e){
+        		int nBins = Math.min(Integer.parseInt(JOptionPane.showInputDialog("Enter number of radial bins to put the data in")),t.x.length);
+        		double[] total= new double[nBins];
+        		int[] count = new int[nBins];
+        		for(int i=0;i<nBins;i++){
+        			count[i]=0;
+        			total[i]=0.0;
+        		}
+        		
+        		double binSize = Math.sqrt(t.x.length * t.x.length + t.y.length * t.y.length)/nBins/2;
+        		System.out.println("binSize: " + binSize);
+        		
+        		if(showFFT){
+        			for(int j=0;j<t.x.length;j++){
+        				for(int k=0;k<t.y.length;k++){
+        					total[(int)(Math.sqrt((j-t.x.length/2) * (j-t.x.length/2)+(k-t.y.length/2)*(k-t.y.length/2))/binSize)]+=fftmag[j][k];
+        					count[(int)(Math.sqrt((j-t.x.length/2) * (j-t.x.length/2)+(k-t.y.length/2)*(k-t.y.length/2))/binSize)]++;
+        				}
+        			}
+        		}
+        		else{
+        			for(int j=0;j<t.x.length;j++){
+        				for(int k=0;k<t.y.length;k++){
+        					total[(int)(Math.sqrt((j-t.x.length/2)*(j-t.x.length/2)+(k-t.y.length/2)*(k-t.y.length/2))/binSize)]+=t.data[j][k];
+        					count[(int)(Math.sqrt((j-t.x.length/2)*(j-t.x.length/2)+(k-t.y.length/2)*(k-t.y.length/2))/binSize)]++;
+        				}
+        			}
+        		}
+        		
+        		double[][] radialAvg = new double[1][nBins];
+        		for(int i=0;i<nBins;i++){
+        			radialAvg[0][i]=total[i]/count[i];
+        		}
+        		System.out.println("Took radial average");
+        		ColumnIO.writeTableCSV(radialAvg, FileOps.selectSave(fc).toString());
+        	}
+        }
+        radialAvgMI.addActionListener(new radialAvgAL(t));
         
         //Manipulation menu
         JMenu manipMenu = new JMenu("Manipulation");
@@ -860,6 +914,25 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
            }
         }
     	takeSecDerivMI.addActionListener(new takeSecDerivAL(t));
+    	
+        
+        //Manipulation-> take autocorrelation
+        JMenuItem autocorrMI = new JMenuItem("Take autocorrelation");
+        manipMenu.add(autocorrMI);
+        class autocorrAL implements ActionListener{
+        	Layer t;
+        	autocorrAL(Layer tPrime){
+        		t=tPrime;
+        	}
+        	public void actionPerformed(ActionEvent e){
+    	    	if(spec==null){
+	    			backup = Layer.newLayer(t, FieldOps.copy(t.data));
+	    			t.data = FieldOps.getAutocorrelationFourier(t.data);
+	    			resetGraphics(true);
+    	    	}
+        	}
+        }
+        autocorrMI.addActionListener(new autocorrAL(t));
     	
     	//Point spectra menu
     	JMenu specMenu = new JMenu("Point Spectra");
@@ -1009,46 +1082,7 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
     	    }
         }
     	layerSpecMI.addActionListener(new layerSpecAL(rob));
-    	
-//    	////////////////////////////////////
-//    	//Zoom-> Gives ability to zoom in and then zoom out
-//		JMenu zoomMenu = new JMenu("Zoom");
-//		menuBar.add(zoomMenu);
-//    	
-//		//Zoom in-> zoom in by selecting a point and square box dimension;
-//		JMenuItem zoomInMI = new JMenuItem("Zoom In");
-//		zoomMenu.add(zoomInMI);
-//		class zoomInAL implements ActionListener{
-//			Layer t;
-//			zoomInAL(Layer tPrime){
-//				t=tPrime;
-//			}
-//			public void actionPerformed(ActionEvent e){
-//				t.zoomIn();
-//				java.awt.Dimension screenSize=Toolkit.getDefaultToolkit().getScreenSize();
-//				sizeratio=(int)(screenSize.getHeight()/t.nx);
-//			}
-//		}
-//		zoomInMI.addActionListener(new zoomInAL(t));
-//		
-//		//Zoom out -> zoom out to the previous size
-//		JMenuItem zoomOutMI = new JMenuItem("Zoom Out");
-//		zoomMenu.add(zoomOutMI);
-//		class zoomOutAL implements ActionListener{
-//			Layer t;
-//			zoomOutAL(Layer tPrime){
-//				t=tPrime;
-//			}
-//			public void actionPerformed(ActionEvent e){
-//				//t.zoomOut();
-//				//sizeratio=change ratio
-//			}
-//		}
-//		zoomOutMI.addActionListener(new zoomOutAL(t));
-//		
-//		/////////////////////////////////////////////////////////
 		
-    	
 		showWindow();
 		setTitle("Title");
 		
@@ -1232,11 +1266,10 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 			zoomFactor *= 2;
 			imageOverField /= 2;
 		}
-		//Changed to accept size ratios other than 2^n 
-		while (sizeratio*sx < defaultSize)
+		while (sizeratio*sx < defaultSize && sizeratio*sx*2 <= defaultSize)
 		{
-			sizeratio++;
-			imageOverField++;
+			sizeratio*=2;
+			imageOverField *= 2;
 		}
 		setFieldInfo();
 		if (redoColorScale)
@@ -1538,8 +1571,7 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 			if (sectionDrawer == null)
 			{	
 				if (line == null) line = new double[][] {{0, 0}, {t.nx, t.ny}};
-				//number of points in a line cut is second argument
-				sectionDrawer = new LayerCutDrawer(this, 64, line);
+				sectionDrawer = new LayerCutDrawer(this, 2, line);
 				sectionDrawer.setFC(fc);
 			}
 			else {
@@ -1803,7 +1835,6 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 		{
 			AtomicCoordinatesSet latt = new AtomicCoordinatesSet(ColumnIO.getASCII(FileOps.selectOpen(fc).toString()));
 			t = TopomapUtil.makeSymmetrizedFFT(t, latt, JOptionPane.showConfirmDialog(null, "Lattice is square?") == JOptionPane.YES_OPTION);
-			Layer.writeBIN(t,fc);
 			this.resetColorScale();
 			this.formImage();
 			this.repaint();
@@ -1854,9 +1885,7 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
             Point currCoords = arg0.getLocationOnScreen();
             this.setLocation(currCoords.x - mouseDownCompCoords.x, currCoords.y - mouseDownCompCoords.y);
 		}
-		//fixed the mouse drag by updating the current position of the mouse every MouseEvent
-		currentx=x;
-		currenty=y;
+
 	}
 	
 	public void mouseMoved(MouseEvent arg0) {
@@ -1898,9 +1927,9 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 	}
 	public void moveLine(int dx, int dy)
 	{
-		line[nearestEndIndex][0] += ((double)dx)/((double)sizeratio);
-		line[nearestEndIndex][1] += ((double)dy)/((double)sizeratio);
-		System.out.println(Printer.getTable(line) + "a\r\n");
+		line[nearestEndIndex][0] += dx/imageOverField;
+		line[nearestEndIndex][1] += dy/imageOverField;
+		System.out.println(Printer.getTable(line) + "\r\n");
 	}
 	public void moveLineBoth(int dx, int dy)
 	{
@@ -1908,7 +1937,7 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 		line[0][1] += dy/imageOverField;
 		line[1][0] += dx/imageOverField;
 		line[1][1] += dy/imageOverField;
-		System.out.println(Printer.getTable(line) + "b\r\n");
+		System.out.println(Printer.getTable(line) + "\r\n");
 	}
 //	private void showCustomLayers() {
 //		// TODO Auto-generated method stub
@@ -2016,14 +2045,10 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 		Topomap.setStdDir();
 		fc = new JFileChooser(Topomap.stddir);
 		Layer t = Layer.openFree(fc);
-		//Changed to make the window display as large as possible while fitting in your display
-		//If you want to make it smaller, increase the value of makeWindowSmaller from 0
-		java.awt.Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-		int makeWindowSmaller=0;
-		int largerDim= Math.max(t.nx,t.ny);
-		int scalefactor= (int)(screenSize.getHeight()/largerDim) - makeWindowSmaller;
-		int sizechoice = largerDim*scalefactor;
-		new LayerViewer(t, Topomap.stddir, sizechoice);
+		int initSize = t.nx;
+		while (initSize*2 < 1200)
+			initSize *= 2;
+		new LayerViewer(t, Topomap.stddir, initSize);
 	}
 	
 	public static void show(Layer t, int size, boolean closeDefault)
