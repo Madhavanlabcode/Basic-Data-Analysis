@@ -881,29 +881,6 @@ public class ColumnIO {
 			firstStream.append(x[i] + "\t" + y[i] + "\n");
 		}		
 	}
-	///////////////////////////////////////////////////////////////////////////////////////
-	public static void writeTwoColumnsTxt(double[] x, double[] y, String filepath)
-	{
-		String usePath = filepath.endsWith(".txt") ? filepath : filepath + ".txt";
-		//This will only work properly if both arrays are of the same length:
-		int length = Math.min(x.length, y.length);
-		PrintStream firstStream = null;
-		
-		try{
-			firstStream = new PrintStream(new File(usePath));
-		}
-		catch (FileNotFoundException e)
-		{
-			System.out.println("No new file.");
-		}
-		for (int i = 0; i < length; i++)
-		{
-			firstStream.append(x[i] + "\t" + y[i] + "\n");
-		}		
-	}
-	///////////////////////////////////////////////////////////////////////////////////////
-	
-	
 	//Used for histograms
 	public static void writeTwoColumns(double[] x, int[] y, String writeFile, String folder)
 	{

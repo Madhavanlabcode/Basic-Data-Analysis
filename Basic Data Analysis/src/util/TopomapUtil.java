@@ -1149,6 +1149,68 @@ public class TopomapUtil {
 		return Topomap.newTopomap(t, data);
 	}
 	
+	public static void getAve(Topomap t){
+       
+		 double[] avg= new double[t.nlayers];
+		 double[] avgo= new double[t.nlayers];
+		for(int k=0; k<t.nlayers;k++){
+			for (int j=0;j<t.ny;j++){
+				for(int i=0; i<t.nx;i++){
+				avg[k] += t.data[k][i][j];
+				avgo[k]=avg[k]/(t.nx*t.ny);
+				}
+			}
+		}
+		for(int k=0; k<t.nlayers;k++){
+			System.out.println(avgo[k]+"	"+t.v[k]);
+		}
+	}
+	
+	public static Layer superconductingGapMap(Topomap t){
+		double[][] data = new double[t.nx][t.ny];
+		double minimum=0;
+		int minV=0;
+		double firstMax;
+		int firstV=0;
+		double secondMax;
+		int secondV=0;
+		
+		for (int i = 0; i < t.nx; i++){
+			for (int j = 0; j < t.ny; j++){
+				minimum=t.data[0][i][j];
+				for (int k = 0; k < t.nlayers; k++){
+					if(t.data[k][i][j]<minimum){
+						minimum=t.data[k][i][j];
+						minV=k;
+					}
+				}
+				firstMax=minimum;
+				for (int k = minV; k < t.nlayers; k++){
+					if(t.data[k][i][j]>=firstMax){
+						firstMax=t.data[k][i][j];
+						firstV=k;
+					}else{
+						break;
+					}
+				}
+				secondMax=minimum;
+				for (int k = minV; k >= 0; k--){
+					if(t.data[k][i][j]>=secondMax){
+						secondMax=t.data[k][i][j];
+						secondV=k;
+					}else{
+						break;
+					}
+				}
+				data[i][j]=t.v[firstV]-t.v[secondV];
+			}
+		}
+		
+		Layer ans = Layer.newLayer(t, data);
+		ans.v=0;
+		return ans;
+	}
+	
 	public static Layer getSimplestGapMap(Topomap t, double cutoff)
 	{
 		double[][] data = new double [t.nx][t.ny];
@@ -2711,6 +2773,34 @@ public class TopomapUtil {
 		
 		return new Topomap(newData, t.v, x, y, null);
 	}
+	
+	public static Topomap makeSymmetrizedFFTs(Topomap t, AtomicCoordinatesSet latt, int fold)
+	{
+		double[][][] newData = new double [t.nlayers][t.nx][t.ny];
+		boolean log = JOptionPane.showConfirmDialog(null, "Use log scale?") == JOptionPane.YES_OPTION;
+//		if (!square) ColumnIO.writeString(LayerUtil.getSymmetrizedTriangleLattice(latt, t.getLayer(0)).toString(), FileOps.selectSave(null).toString());
+		for (int i = 0; i < t.nlayers; i++){
+			if (fold==4)
+				newData[i] = LayerUtil.symmetrizeFFT_1(latt, t.getLayer(i), log);
+			else if(fold==6)
+				newData[i] = LayerUtil.symmetrizeFFTTriang(latt, t.getLayer(i), log);
+			else if(fold==2)
+				newData[i] = LayerUtil.symmetrizeFFTTwofold(t.getLayer(i), log);
+//			FieldOps.log(newData[i]);
+		}
+		
+		double dx = 2*Math.PI/t.xLength;
+		double dy = 2*Math.PI/t.yLength;
+		double[] x = new double [t.nx];
+		double[] y = new double [t.ny];
+		for (int i = 0; i < t.nx; i++)
+			x[i] = (i-t.nx/2)*dx;
+		for (int j = 0; j < t.ny; j++)
+			y[j] = (j-t.ny/2)*dy;
+		
+		return new Topomap(newData, t.v, x, y, null);
+	}
+	
 	public static Layer makeSymmetrizedFFT(Layer t, AtomicCoordinatesSet latt, boolean square)
 	{
 		double[][] newData = new double [t.nx][t.ny];

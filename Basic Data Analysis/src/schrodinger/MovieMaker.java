@@ -12,7 +12,7 @@ import util.robot.Robo;
 public class MovieMaker {
 	static double hbar = 1, m = 1;
 	
-	public static String avidir = "D:\\Java\\movie maker\\";
+	public static String avidir = "C:\\Users\\Dan\\Documents\\BMP to AVI\\";
 	public static void main(String[] args)
 	{
 //		int N = 512;
