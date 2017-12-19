@@ -128,7 +128,7 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
 	//color scale change feater.
 //	int currentCScale = 0;
 	ColorScaleHolder csh;
-	private boolean changeScaleWithLayer;
+	private boolean changeScaleWithLayer=true;
 	private boolean ftlog = true;
 	private boolean refreshFFT = false;
 	
@@ -380,7 +380,6 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
 						break;
 					}
 					case 4:{
-						String shortname = name.contains(" ") ? name.split(" ")[0] : name;
 						int nPerLine1 = Integer.parseInt(JOptionPane.showInputDialog("How many tiles per line?"));
 						boolean useCurrentScale = JOptionPane.showConfirmDialog(null, "Lock the color scale?") == JOptionPane.YES_OPTION; 
 						double minperc = useCurrentScale ? 0 : Double.parseDouble(JOptionPane.showInputDialog("Minimum distribution cutoff?"));
@@ -877,6 +876,54 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
       		}	
         }
         ThreeDFftMI.addActionListener(new ThreeDFftAL(t));
+
+        //Fourier->Show spatial modulation of a Q-vector
+        JMenuItem spatialLockinMI = new JMenuItem("Show spatial modulation of a q-vector");
+        fourierMenu.add(spatialLockinMI);
+        class spatialLockinAL implements ActionListener{
+        	Topomap t;
+        	String dir;
+        	spatialLockinAL(Topomap tPrime, String dirPrime){
+        		t=tPrime;
+        		dir=dirPrime;
+        	}
+        	public void actionPerformed(ActionEvent e) {
+      			double[][][] Rea = new double [t.nlayers][t.nx][t.ny];
+      			double[][][] Ima = new double [t.nlayers][t.nx][t.ny];
+      			double[][][] Mag = new double [t.nlayers][t.nx][t.ny];
+      			
+      			//get Q
+      			String qString = JOptionPane.showInputDialog("Q-vector components (relative to center, in units of FFT pixels, comma-separated)");
+				double Qx = Double.parseDouble(qString.split(",")[0].trim());
+				double Qy = Double.parseDouble(qString.split(",")[1].trim());
+      			
+      			//multiply t by e^iQ.r
+				System.out.println("Demodulating, with wave numbers " + Qx + ", " + Qy + ".");
+				for(int i=0;i<t.nlayers;i++)
+					for(int j=0;j<t.nx;j++)
+						for(int k=0;k<t.ny;k++){
+							Rea[i][j][k]=t.data[i][j][k]*Math.cos(Qx*j*2*Math.PI/t.nx+Qy*k*2*Math.PI/t.ny);
+							Ima[i][j][k]=t.data[i][j][k]*Math.sin(Qx*j*2*Math.PI/t.nx+Qy*k*2*Math.PI/t.ny);
+						}
+      			
+      			//get blur length
+				double wavelength = t.nx/Math.sqrt(Math.pow(Qx,2)+Math.pow(Qy,2));
+      			double blurLength = Double.parseDouble(JOptionPane.showInputDialog("Averaging length scale, in units of pixels. (Wavelength is " + wavelength + ")."));
+      			//gaussian blur
+      			System.out.print("Low-pass filtering with length scale " + blurLength + ". Be patient.");
+      			for(int i=0;i<t.nlayers;i++){
+      				Rea[i]=FieldOps.gaussSmooth(Rea[i], blurLength);
+      				System.out.println("  Halfway there.");
+      				Ima[i]=FieldOps.gaussSmooth(Ima[i], blurLength);
+      				Mag[i]=FieldOps.magnitude(Rea[i], Ima[i]);
+      			}
+      			
+      		
+      			new TopomapViewer_complex2(Topomap.newTopomap(t, Rea), Topomap.newTopomap(t, Ima),dir, 512);
+      			new TopomapViewer(Topomap.newTopomap(t, Mag),dir, 512);
+      		}	
+        }
+        spatialLockinMI.addActionListener(new spatialLockinAL(t,dir));
         
         //Selecting data menu
         JMenu selectionMenu = new JMenu("Selection tools");
@@ -909,6 +956,46 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
         	}
         }
         toggleLinecutMI.addActionListener(new toggleLinecutAL(t));
+
+        //Selection->mirror data across linecut
+        JMenuItem mirrorLinecutMI = new JMenuItem("Mirror data across linecut");
+        selectionMenu.add(mirrorLinecutMI);
+        class mirrorLinecutAL implements ActionListener{
+        	Topomap t;
+        	mirrorLinecutAL(Topomap tPrime){
+        		t=tPrime;
+        	}
+        	public void actionPerformed(ActionEvent e){
+    			if (line != null){
+    				double[][][] result = new double[t.nlayers][t.nx][t.ny];
+    				double[] mirror=new double[2];
+    				mirror[0]=line[0][1]-line[1][1];
+    				mirror[1]=line[1][0]-line[0][0];
+    				double length = Math.pow(Math.pow(mirror[0],2)+Math.pow(mirror[1],2),0.5);
+    				mirror[0] = mirror[0]/length;
+    				mirror[1] = mirror[1]/length;
+    				System.out.println("Mirror vector: " + mirror[0] + "," + mirror[1]);
+    				for(int a=0;a<t.nlayers;a++){
+    					for(int b=0;b<t.nx;b++){
+    						for(int c=0;c<t.ny;c++){
+    							double distance = (b-line[0][0])*mirror[0]+(c-line[0][1])*mirror[1];
+    							int bPrime = (int)(-2*distance*mirror[0]+b);
+    							int cPrime = (int)(-2*distance*mirror[1]+c);
+    							if(bPrime>0 && bPrime<t.nx && cPrime>0 && cPrime<t.ny){
+    								result[a][b][c] = (t.data[a][b][c]+t.data[a][bPrime][cPrime])/2;
+    							}
+    							else{
+    								result[a][b][c]=t.data[a][b][c];
+    							}
+    						}
+    					}
+    				}
+    				t.data = result;
+    			}
+    			resetGraphics(true, 0, 1);
+        	}
+        }
+        mirrorLinecutMI.addActionListener(new mirrorLinecutAL(t));
         
         //Selection->how to mark a point
         selectionMenu.add(new JMenuItem("Use 'm' key to mark a point in copied image"));
@@ -1120,7 +1207,7 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
         	}
         }
         saveCroppedMI.addActionListener(new saveCroppedAL(t));
-        
+
         //Selection->Mask using a mask map
         JMenuItem maskMaskMapMI = new JMenuItem("Spatially filter all layers using a mask map");
         selectionMenu.add(maskMaskMapMI);
@@ -1130,9 +1217,19 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
         		t=tPrime;
         	}
         	public void actionPerformed(ActionEvent e){
-        		Topomap spf = Topomap.open(fc);
-				for (int i = 0; i < t.nlayers; i++)
-					t.data[i] = FieldOps.spatialFilter(t.data[i], spf.data[i]);
+        		String[] options = {"Mask is a topomap", "Mask is a layer"};
+        		switch(JOptionPane.showOptionDialog(null,"Choose mask type","TopomapViewer",JOptionPane.DEFAULT_OPTION,JOptionPane.PLAIN_MESSAGE,null,options,"Mask topomap")){
+        		case 0:
+            		Topomap spf = Topomap.open(fc);
+    				for (int i = 0; i < t.nlayers; i++)
+    					t.data[i] = FieldOps.spatialFilter(t.data[i], spf.data[i]);
+        			break;
+        		case 1:
+            		Layer msk = Layer.openFree(fc);
+    				for (int i = 0; i < t.nlayers; i++)
+    					t.data[i] = FieldOps.spatialFilter(t.data[i], msk.data);
+        			break;
+        		}
         	}
         }
         maskMaskMapMI.addActionListener(new maskMaskMapAL(t));
@@ -1305,6 +1402,61 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
         	}
         }
         gapMapMI.addActionListener(new gapMapAL(t));
+
+        //Analysis->Take radial average
+        JMenuItem radialAvgMI = new JMenuItem("Save the radial average of each layer as csv");
+        analysisMenu.add(radialAvgMI);
+        class radialAvgAL implements ActionListener{
+        	Topomap t;
+        	radialAvgAL(Topomap tPrime){
+        		t=tPrime;
+        	}
+        	public void actionPerformed(ActionEvent e){
+        		int nBins = Math.min(Integer.parseInt(JOptionPane.showInputDialog("Enter number of radial bins to put the data in")),(t.x.length*2/3));
+        		double[][] total= new double[t.nlayers][nBins];
+        		int[][] count = new int[t.nlayers][nBins];
+        		for(int i=0;i<nBins;i++){
+        			for(int j=0;j<t.nlayers;j++){
+               			count[j][i]=0;
+               			total[j][i]=0.0;
+        			}
+        		}
+        		
+        		double binSize = Math.sqrt(t.x.length * t.x.length + t.y.length * t.y.length)/nBins/2;
+        		System.out.println("binSize: " + binSize);
+        		
+        		if(showFFT){
+        			for(int i=0;i<t.nlayers;i++){
+	        			for(int j=0;j<t.x.length;j++){
+	        				for(int k=0;k<t.y.length;k++){
+	        					total[i][Math.min((int)(Math.sqrt((j-t.x.length/2)*(j-t.x.length/2)+(k-t.y.length/2)*(k-t.y.length/2))/binSize),nBins-1)]+=fftmag[i][j][k];
+	        					count[i][Math.min((int)(Math.sqrt((j-t.x.length/2)*(j-t.x.length/2)+(k-t.y.length/2)*(k-t.y.length/2))/binSize),nBins-1)]++;
+	        				}
+	        			}
+        			}
+        		}
+        		else{
+        			for(int i=0;i<t.nlayers;i++){
+	        			for(int j=0;j<t.x.length;j++){
+	        				for(int k=0;k<t.y.length;k++){
+	        					total[i][Math.min((int)(Math.sqrt((j-t.x.length/2)*(j-t.x.length/2)+(k-t.y.length/2)*(k-t.y.length/2))/binSize),nBins-1)]+=t.data[i][j][k];
+	        					count[i][Math.min((int)(Math.sqrt((j-t.x.length/2)*(j-t.x.length/2)+(k-t.y.length/2)*(k-t.y.length/2))/binSize),nBins-1)]++;
+	        				}
+	        			}
+        			}
+        		}
+        		
+        		double[][] radialAvg = new double[t.nlayers][nBins];
+        		for(int i=0;i<nBins;i++){
+        			for(int j=0;j<t.nlayers;j++){
+        				radialAvg[j][i]=total[j][i]/count[j][i];
+        			}
+        		}
+        		System.out.println("Took radial average");
+        		ColumnIO.writeTableCSV(radialAvg, FileOps.selectSave(fc).toString());
+        	}
+        }
+        radialAvgMI.addActionListener(new radialAvgAL(t));
         
         //Manipulation menu
         JMenu manipMenu = new JMenu("Manipulation");
@@ -1571,6 +1723,42 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
         	}
         }
         subMapMI.addActionListener(new subMapAL(t));
+        
+        //Manipulation->Normalize spectra to some data
+        JMenuItem normalizeSpectraMI = new JMenuItem("Normalize spectra by some region");
+        manipMenu.add(normalizeSpectraMI);
+        class normalizeSpectraAL implements ActionListener{
+        	Topomap t;
+        	normalizeSpectraAL(Topomap tPrime){
+        		t=tPrime;
+        	}
+        	public void actionPerformed(ActionEvent e){
+        		String message = "Enter the voltages to integrate between (inclusive), separated by a comma.\nThe data range is " + t.v[0] + " to " + t.v[t.nlayers-1];
+				String vLimits = JOptionPane.showInputDialog(message);
+				String[] tokens = vLimits.split(",");
+				for (int i = 0; i < tokens.length; i++)
+					tokens[i] = tokens[i].trim();
+				double first = Double.parseDouble(tokens[0]);
+				double second = Double.parseDouble(tokens[1]);
+				double[][] total = new double[t.x.length][t.y.length];
+				FieldOps.zero(total);
+				int flag=0;
+				for(int x=0;x<t.nlayers;x++){
+					if((first<=t.v[x] && t.v[x]<=second) || (second<=t.v[x] && t.v[x]<=first)){
+						total = FieldOps.add(total, t.data[x]);
+						flag=x;
+					}
+				}
+				for(int a=0;a<t.nlayers;a++){
+					for(int b=0;b<t.x.length;b++){
+						for(int c=0;c<t.y.length;c++){
+							t.data[a][b][c] = t.data[a][b][c]/total[b][c] * t.mean[flag];
+						}
+					}
+				}
+        	}
+        }
+        normalizeSpectraMI.addActionListener(new normalizeSpectraAL(t));
         
         
         
@@ -2441,10 +2629,22 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
 		}
 		if (arg0.getKeyChar() == 'M')
 		{
-			int o2 = JOptionPane.showConfirmDialog(null, "Yes for 6-fold\r\nNo for 4-fold");
-			if (latt == null) latt = new AtomicCoordinatesSet(FileOps.openText(fc));
+			String[] options = {"6-fold","4-fold","2-fold"};
+			int fold = JOptionPane.showOptionDialog(null,"Choose symmetry. You may need lattice parameters from drift correction.","Symmetrization",JOptionPane.DEFAULT_OPTION,JOptionPane.PLAIN_MESSAGE,null,options,"");
+			switch(fold){
+			case 0:
+				if (latt == null) latt = new AtomicCoordinatesSet(FileOps.openText(fc));
+				t = TopomapUtil.makeSymmetrizedFFTs(t, latt, 4);
+				break;
+			case 1:
+				if (latt == null) latt = new AtomicCoordinatesSet(FileOps.openText(fc));
+				t = TopomapUtil.makeSymmetrizedFFTs(t, latt, 6);
+				break;
+			case 2:
+				t = TopomapUtil.makeSymmetrizedFFTs(t, latt, 2);
+				break;
+			}
 
-			t = TopomapUtil.makeSymmetrizedFFTs(t, latt, o2 == JOptionPane.NO_OPTION);
 			Topomap.writeBIN(t, fc);
 			resetGraphics(true, 0, 1);
 		}
@@ -3408,6 +3608,16 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
 					t.data[i] = FieldOps.spatialFilter(t.data[i], spf.data[i]);
 				break;
 			}
+			case 34:{
+				Layer scGap = TopomapUtil.superconductingGapMap(t);
+				LayerViewer.show(scGap, 512, false);
+				break;
+			}
+			case 35:{
+				TopomapUtil.getAve(t);
+			
+				break;
+			}
 
 		}
 		refreshFFT = true;
@@ -3463,7 +3673,7 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
 			frame.add(this);
 		}
 		public void show(){
-			frame.show();
+			frame.setVisible(true);
 		}
 		@Override
 		public void stateChanged(ChangeEvent arg0) {

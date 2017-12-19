@@ -2,9 +2,9 @@ package util.fileops;
 
 import image.ImageEditing;
 
+
 //Added vectors to store previous versions of zooms
 import java.util.Vector;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -14,6 +14,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
@@ -22,6 +23,7 @@ import org.apache.commons.math3.analysis.interpolation.BicubicSplineInterpolatin
 import org.apache.commons.math3.analysis.interpolation.BicubicSplineInterpolator;
 
 //import flanagan.interpolation.BiCubicInterpolation;
+
 
 
 import util.ArrayOps;
@@ -247,7 +249,25 @@ public class Layer  extends MapRectCoordSystem{
 		try {
 			nx = ind.readInt();
 			ny = ind.readInt();
-			v = ind.readDouble();
+
+			//read 8 bytes: if the first 4 bytes are an int with length 1:
+			//open only layer of topomap as a Layer
+			//else continue as if it's a Layer
+			byte[] testBytes = new byte[8];
+			for(int i=0;i<8;i++){
+				testBytes[i]=ind.readByte();
+			}
+			
+			if(ByteBuffer.wrap(testBytes).getInt()==1){
+				System.out.println("Opening single-layer Topomap as Layer");
+				ind.close();
+				inbuff.close();
+				inf.close();
+				Topomap t1=Topomap.readBIN(filepath);
+				return t1.getLayer(0);
+			}
+			v = ByteBuffer.wrap(testBytes).getDouble();
+			
 			current = ind.readDouble();
 			x = new double[nx]; y = new double [ny];
 			data = new double [nx][ny];

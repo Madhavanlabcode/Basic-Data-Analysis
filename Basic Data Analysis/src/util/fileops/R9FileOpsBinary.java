@@ -6,20 +6,11 @@ import java.nio.ByteBuffer;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 
-import drawing.LayerViewer;
 import util.ArrayOps;
 import util.FieldOps;
 import util.TopomapUtil;
-import util.color.ColorScale;
-import util.color.ColorScales;
-import util.fileops.MultiFileViewer.TimeStampedLayer;
-/**
- * This code is intended to reproduce as literally as possible the matlab code
- * in read_sm4.m.
- * @author Dan
- *
- */
-public class RHKFileOpsBinary {
+
+public class R9FileOpsBinary {
 	public static String rhkdir = "C:\\Users\\Charlie\\Desktop";
 	public static String[] defaultSufficesSix = new String[] {"didv_r","didv_f","curr_r","curr_f","topo_r","topo_f"};
 
@@ -30,16 +21,111 @@ public class RHKFileOpsBinary {
 	public static void main(String[] args)
 	{
 		Topomap.setStdDir();
-//		exportAnEntireDirectoryTopomapStyle();
-		JFileChooser fc = new JFileChooser(rhkdir);
-		JFileChooser fco = new JFileChooser(Topomap.stddir);
-		String fp = FileOps.selectOpen(fc).toString();
-		String fo = FileOps.selectSave(fco).toString();
-		exportOneFileQuick(fp,fo);
-//		EntireRHKFile rhk = loadFile(fp);
-//		Layer[] layers = getLayers(fp);
-//		for (int i = 0; i < layers.length; i++)
-//			LayerViewer.show(layers[i], 1024, true);
+		String fp;
+		String fo;
+		String[] options = {"Convert a layer", "Convert a directory to topomap", "Convert a spectrum", "Convert a dIdV map", "Convert some mix of image/spectra"};
+		switch(JOptionPane.showOptionDialog(null,"Choose task","R9 File Ops",JOptionPane.DEFAULT_OPTION,JOptionPane.PLAIN_MESSAGE,null,options,"Convert a layer")){
+		case 0:
+			fp = FileOps.selectOpen(new JFileChooser(rhkdir)).toString();
+			fo = FileOps.selectSave(new JFileChooser(Topomap.stddir)).toString();
+			exportOneFileQuick(fp,fo);
+			break;
+		case 1:
+			exportAnEntireDirectoryTopomapStyle();
+			break;
+		case 2:
+			fp = FileOps.selectOpen(new JFileChooser(rhkdir)).toString();
+			fo = FileOps.selectSave(new JFileChooser(Topomap.stddir)).toString();
+			exportOneFileQuick(fp,fo);
+			break;
+		case 3:
+			fp = FileOps.selectOpen(new JFileChooser(rhkdir)).toString();
+			fo = FileOps.selectSave(new JFileChooser(Topomap.stddir)).toString();
+			exportSpectraAsTopomap(fp,fo);
+			break;
+		case 4:
+			fp = FileOps.selectOpen(new JFileChooser(rhkdir)).toString();
+			fo = FileOps.selectSave(new JFileChooser(Topomap.stddir)).toString();
+			exportFileAsWritten(fp,fo);
+			break;
+		}
+	}
+	
+	public static void exportSpectraAsTopomap(String input, String output){
+		EntireRHKFile f = loadFile(input);
+		int npages = f.getNPages();
+		int nx;
+		int nx2;
+
+		float xOffset = 0f;
+		float yOffset = 0f;
+		float xScale = 1f;
+		float yScale = 1f;
+		
+		int imagePage= -1;
+		for (int i = 0; i < npages; i++){
+			if(f.pis[i].pageDataType==1){
+				imagePage = i;
+			}
+		}
+		if(imagePage>=0){
+			xOffset = f.headers[imagePage].xOffset;
+			yOffset = f.headers[imagePage].yOffset;
+			xScale = f.headers[imagePage].xScale;
+			yScale = f.headers[imagePage].yScale;
+		}
+		
+		for (int i = 0; i < npages; i++){
+			if(f.pis[i].pageDataType==1){				
+				//f.headers[i].xy[2] is number of voltages, f.headers[i].xy[3] is number of spectra
+				nx=(int) Math.sqrt(f.headers[i].xy[3]);
+				nx2=(int) Math.sqrt(f.headers[i].xy[3] / 2);
+				if(Math.abs(nx-Math.sqrt(f.headers[i].xy[3])) > 0.01 && Math.abs(nx2-Math.sqrt(f.headers[i].xy[3] / 2)) < 0.01){
+						nx=2*nx2; }
+				else{
+					nx2=nx; }
+				
+				System.out.println("layer " +i + ". xSize = " + nx2);
+				double[][][] data = new double [f.headers[i].xy[2]][nx2][nx2];
+				for(int j=0; j<nx2; j++){
+					for(int k=0; k<nx2; k++){
+						for(int l=0; l<f.headers[i].xy[2]; l++){
+							if(nx2==nx){
+								data[f.headers[i].xy[2]-l-1][nx2-j-1][k] = f.theData.z[i][l][j+nx*k];
+							} else {
+								data[f.headers[i].xy[2]-l-1][nx2-j-1][k] = (f.theData.z[i][l][2*j+nx*k] + f.theData.z[i][l][2*j+1+nx*k]) / 2;
+							}
+						}
+					}
+				}
+				double[] v = ArrayOps.generateArray(f.headers[i].xOffset, f.headers[i].xScale, f.headers[i].xy[2]);
+				double[] x = ArrayOps.generateArray(xOffset, xScale, nx2);
+				double[] y = ArrayOps.generateArray(xOffset, xScale, nx2);
+				Topomap.writeBIN(new Topomap(data, v, x, y, null), output + i + "_map.bin");
+			}
+		}
+	}
+	
+	public static void exportFileAsWritten(String input, String output){
+		EntireRHKFile f = loadFile(input);
+		int npages = f.getNPages();
+		Layer imageLayer;
+		for (int i = 0; i < npages; i++){
+			//export layer
+			if(f.pis[i].pageDataType==0){
+				imageLayer = new Layer(f.theData.z[i], f.theData.x[i], f.theData.y[i], f.headers[i].bias, f.headers[i].current);
+				Layer.writeBIN(imageLayer, output + f.sdata[i].label + i + "_image.bin");
+			}
+			//export spectra
+			else if(f.pis[i].pageDataType==1){
+				ArrayOps.flipX(f.theData.z[i]);
+				PointSpectra ps = new PointSpectra(FieldOps.transpose(f.theData.z[i]), f.theData.x[i], f.theData.y[i], f.theData.y[i]);
+				PointSpectra.writeBIN(ps, output + f.sdata[i].label + i + "_spectra.bin");
+			}
+			else{
+				JOptionPane.showMessageDialog(null, "Error: Page not spectra or image. Skipping.");
+			}
+		}
 	}
 	
 	public static void exportAnEntireDirectoryTopomapStyle()
@@ -118,12 +204,13 @@ public class RHKFileOpsBinary {
 		String[] suffices;
 		if (npages == 1)
 		{
+			ArrayOps.flipX(f.theData.z[0]);
 			PointSpectra ps = new PointSpectra(FieldOps.transpose(f.theData.z[0]), f.theData.x[0], f.theData.y[0], f.theData.y[0]);
 			PointSpectra.writeBIN(ps, output);
 			return;
 		}
 		if (npages/2 == 3)
-			suffices = new String[] {"didv_r","didv_f","curr_r","curr_f","topo_r","topo_f"};
+			suffices = new String[] {"curr_r","curr_f","topo_r","topo_f","didv_r","didv_f"};
 		else
 		{
 			JOptionPane.showMessageDialog(null, "There are " + ((npages/2)*2) + " non-spectral pages and we don't recognize their names.\r\nIn the next box, enter them separated by commas.");
@@ -191,11 +278,14 @@ public class RHKFileOpsBinary {
 	{
 		ByteBuffer bb = DavisFileOps.getFromFile(filepath);
 		RHKFileHeader header = readFileHeader(bb);
+		bb.position(header.headerSize+2);
 		RHKObject[] objectList = new RHKObject[header.objectListCount];
 		for (int i = 0; i < objectList.length; i++)
 			objectList[i] = readObjects(bb);
 		PageIndexHeader pih = readPageIndexHeader(bb);
-		RHKObject object = readObjects(bb);
+		RHKObject[] ihObject = new RHKObject[pih.objectListCount];
+		for (int i = 0; i < pih.objectListCount; i++)
+			ihObject[i] = readObjects(bb);
 		PageIndex[] pis = new PageIndex[pih.pageCount];
 		RHKObject[][] pageIndexArray = new RHKObject[pih.pageCount][4];
 		for (int i = 0; i < pih.pageCount; i++){
@@ -207,17 +297,16 @@ public class RHKFileOpsBinary {
 		StringData[] sdata = new StringData[pih.pageCount];
 		for (int i = 0; i < pih.pageCount; i++)
 		{
-			int start = pageIndexArray[i][0].offset-1;
+			int start = pageIndexArray[i][0].offset;
 			bb.position(start);
 			headers[i] = readPageHeader(bb);
-			bb.getInt(); //read 4 bytes as in matlab: 207
-			for (int j = 0; j < 9; j++)
-				readObjects(bb); //the "object list string" is never seen again in the matlab file.
-			sdata[i] = readStringData(bb);
+			bb.position(start+headers[i].fieldSize);
+			for (int j = 0; j < headers[i].objectListCount; j++)
+				readObjects(bb); //the "object list string" is never seen again
+			sdata[i] = readStringData(bb, headers[i].stringCount);
 		}
 		RHKData theData = readData(bb, pih, headers, pageIndexArray);
-//		System.out.println("This data has: " + theData.z.length + " layers.");
-		return new EntireRHKFile(header, objectList, pih, object, pis, pageIndexArray,headers, sdata, theData);
+		return new EntireRHKFile(header, objectList, pih, ihObject[0], pis, pageIndexArray,headers, sdata, theData);
 	}
 	
 	public static class EntireRHKFile{
@@ -261,7 +350,7 @@ public class RHKFileOpsBinary {
 		int nx, ny;
 		for (int i = 0; i < nlayers; i++)
 		{
-			bb.position(pageIndexArray[i][1].offset-1);
+			bb.position(pageIndexArray[i][1].offset);
 			aux = new int [pageIndexArray[i][1].size/4];
 			aux2 = new double [pageIndexArray[i][1].size/4];
 			for (int j = 0; j < aux.length; j++){
@@ -297,9 +386,9 @@ public class RHKFileOpsBinary {
 		}
 	}
 	
-	private static StringData readStringData(ByteBuffer bb){
-		String[] s = new String [17];
-		for (int i = 0; i < 17; i++)
+	private static StringData readStringData(ByteBuffer bb, int stringCount){
+		String[] s = new String [stringCount];
+		for (int i = 0; i < stringCount; i++)
 		{
 			int length = bb.getShort();
 			s[i] = "";
@@ -374,10 +463,10 @@ public class RHKFileOpsBinary {
 	
 	private static PageHeader readPageHeader(ByteBuffer bb)
 	{
-		bb.get(new byte[3]); //skip 3 bytes
+		short fieldSize = bb.getShort();
 		short stringCount = bb.getShort();
-		int pageType = bb.getInt();
 		
+		int pageType = bb.getInt();
 		int dataSubSource = bb.getInt();
 		int lineType = bb.getInt();
 		int[] xy = new int [4];
@@ -403,19 +492,18 @@ public class RHKFileOpsBinary {
 		int colorInfoCount = bb.getInt();
 		int gridXSize = bb.getInt();
 		int gridYSize = bb.getInt();
-		int[] reserved = new int [16];
-		for (int i = 0; i < 16; i++)
-			reserved[i] = bb.getInt();
-		return new PageHeader(stringCount, pageType, dataSubSource,
+		int objectListCount = bb.getInt();
+		return new PageHeader(fieldSize, stringCount, pageType, dataSubSource,
 			 lineType, xy, imageType, scanDir,
 			 groupID, pageDataSize, minZValue, maxZValue,
 			 xScale, yScale, zScale, xyScale,
 			 xOffset, yOffset, zOffset, period,
 			 bias, current, angle, colorInfoCount,
-			 gridXSize, gridYSize, reserved);
+			 gridXSize, gridYSize, objectListCount);
 	}
 	public static class PageHeader
 	{
+		short fieldSize;
 		short stringCount;
 		int pageType;
 		
@@ -442,15 +530,16 @@ public class RHKFileOpsBinary {
 		int colorInfoCount;
 		int gridXSize;
 		int gridYSize;
-		int[] reserved;
-		public PageHeader(short stringCount, int pageType, int dataSubSource,
+		int objectListCount;
+		public PageHeader(short fieldSize, short stringCount, int pageType, int dataSubSource,
 				int lineType, int[] xy, int imageType, int scanDir,
 				int groupID, int pageDataSize, int minZValue, int maxZValue,
 				float xScale, float yScale, float zScale, float xyScale,
 				float xOffset, float yOffset, float zOffset, float period,
 				float bias, float current, float angle, int colorInfoCount,
-				int gridXSize, int gridYSize, int[] reserved) {
+				int gridXSize, int gridYSize, int objectListCount) {
 			super();
+			this.fieldSize=fieldSize;
 			this.stringCount = stringCount;
 			this.pageType = pageType;
 			this.dataSubSource = dataSubSource;
@@ -476,7 +565,7 @@ public class RHKFileOpsBinary {
 			this.colorInfoCount = colorInfoCount;
 			this.gridXSize = gridXSize;
 			this.gridYSize = gridYSize;
-			this.reserved = reserved;
+			this.objectListCount = objectListCount;
 		}
 	}
 	
@@ -486,6 +575,7 @@ public class RHKFileOpsBinary {
 		for (int i = 0; i < 8; i++)
 			pageID[i] = bb.getShort();
 		int pageDataType = bb.getInt();
+		System.out.println("Data type " + pageDataType + ". Program only works for 0 (image) or 1 (spectra).");
 		int pageSourceType = bb.getInt();
 		int objectListCount = bb.getInt();
 		int minorv = bb.getInt();

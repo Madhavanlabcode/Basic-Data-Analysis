@@ -1182,4 +1182,11 @@ public class ArrayOps {
 		return ans;
 	}
 
+	public static double[][] subtract(double y, double[][] z) {
+		double[][] ans = new double[z.length][z[0].length];
+		for (int i=0; i < ans.length; i++)
+			for(int j=0;j<ans[0].length;j++)
+				ans[i][j] = y-z[i][j];
+		return ans;
+	}
 }
