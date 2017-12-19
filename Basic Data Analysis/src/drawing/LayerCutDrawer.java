@@ -98,11 +98,9 @@ public class LayerCutDrawer {
 			
 		
 		if (g != null){
-			//The x and y data of the line cut
 			g.setDomain(0, s[s.length-1]);
 			g.setRange(spec);
 		}
-
 		if (doingFitting)
 		{
 			fit = ACM_NonLinearFitter.fitToFunctionFull(s, spec, function);
@@ -121,11 +119,9 @@ public class LayerCutDrawer {
 		yVert[0] = min;
 		yVert[1] = max;
 		g.setNumPlots(npts);
-		//Draws the line cut spectra
 		g.setXY(new GraphDrawerCart.GraphObject(s, spec), false, false, 0);
 		g.setColor(def, 0);
 		g.setThin(drawThin, 0);
-		//
 		if (drawingVert)
 		{
 			g.setXY(new GraphDrawerCart.GraphObject(sVert, yVert), false, false, 1);
@@ -160,9 +156,7 @@ public class LayerCutDrawer {
 	}
 	public void putPoints(double[][] line)
 	{
-		
 		double dist = Distance.distance(lv.t.getMetricCoords(line[0]), lv.t.getMetricCoords(line[1]));
-		
 		if (refreshNPTS)
 		{
 			points[0][0] = line[0][0];
@@ -170,15 +164,12 @@ public class LayerCutDrawer {
 			points[points.length-1][0] = line[1][0];
 			points[points.length-1][1] = line[1][1];
 			int n = (int)(dist/spacing);
-			
 			if (n != npts){
 				setNpts(n);
 				return;
 			}
 			
 		}
-		//System.out.println(npts);
-	
 		ArrayOps.putArrayInclBoth(line[0][0], line[1][0], npts, tempx);
 		ArrayOps.putArrayInclBoth(line[0][1], line[1][1], npts, tempy);
 		ArrayOps.putArrayInclBoth(0, dist, npts, s);

@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import javax.swing.JFileChooser;
+
 import drawing.LayerViewer;
 import main.SRAW;
 import schrodinger.MovieMaker;
@@ -43,8 +44,14 @@ public class UnitCellUtil {
 		
 		Layer t = Layer.openFree(fc);
 		AtomicCoordinatesSet latt = new AtomicCoordinatesSet(FileOps.openText(fc));
-		AtomicCoordinatesSet twice = latt.getRt2Lattice().getRt2Lattice();//.getRt2Lattice();
-		Layer avg = getAverageUnitCell(t.data, twice, 0.25, 0.25, 30);
+		
+		int scalingFactor = 0; //every 2 scalingFactor multiplies the size of the viewed cell by 2.
+		
+		for(int i=0;i<scalingFactor;i++){
+			latt = latt.getRt2Lattice();
+		}
+				
+		Layer avg = getAverageUnitCell(t.data, latt, 0.25, 0.25, 30);
 		LayerViewer.show(avg, 512, true);
 		
 //		writeLatticeSitePictures(latt, t, 64, true);
@@ -827,8 +834,15 @@ public class UnitCellUtil {
 	
 	public static Layer getAverageUnitCell(double[][] source, AtomicCoordinatesSet latt, double aOffset, double bOffset, int detail)
 	{
-		int[][] nentries = new int [detail][detail];
+		double[][] nentries = new double [detail][detail];
 		double[][] avg = new double [detail][detail];
+		
+		for(int i=0;i<detail;i++){
+			for(int j=0;j<detail;j++){
+				avg[i][j]=0;
+				nentries[i][j]=0;
+			}
+		}
 		
 		int offsetA = (int)(aOffset*detail);
 		int offsetB = (int)(bOffset*detail);
@@ -848,12 +862,53 @@ public class UnitCellUtil {
 				lp[1] %= 1;
 //				System.out.println(Printer.arrayLnHorizontal(lp));
 				
-				int la = ArrayOps.indexOf(unity, lp[0], true);
-				int lb = ArrayOps.indexOf(unity, lp[1], true);
-				nentries[la][lb]++;
-				avg[la][lb] += source[i][j];
+				
+				int la = (int) Math.floor(lp[0]*detail);
+				int lb = (int) Math.floor(lp[1]*detail);
+				
+				double lx = la-lp[0]*detail;
+				double ly = lb-lp[1]*detail;
+				
+				avg[la][lb] += source[i][j]*(1-lx)*(1-ly);
+				nentries[la][lb] += (1-lx)*(1-ly);
+				if(la==0){
+					avg[detail-1][lb] += source[i][j]*(lx)*(1-ly);
+					nentries[detail-1][lb] += (lx)*(1-ly);
+					
+					if(lb==0){
+						avg[detail-1][detail-1] += source[i][j]*(lx)*(ly);
+						nentries[detail-1][detail-1] += (lx)*(ly);
+						
+						avg[la][detail-1] += source[i][j]*(1-lx)*(ly);
+						nentries[la][detail-1] += (1-lx)*(ly);
+					}else{
+						avg[detail-1][lb-1] += source[i][j]*(lx)*(ly);
+						nentries[detail-1][lb-1] += (lx)*(ly);
+						
+						avg[la][lb-1] += source[i][j]*(1-lx)*(ly);
+						nentries[la][lb-1] += (1-lx)*(ly);
+					}
+				}else{
+					avg[la-1][lb] += source[i][j]*(lx)*(1-ly);
+					nentries[la-1][lb] += (lx)*(1-ly);
+					
+					if(lb==0){
+						avg[la-1][detail-1] += source[i][j]*(lx)*(ly);
+						nentries[la-1][detail-1] += (lx)*(ly);
+						
+						avg[la][detail-1] += source[i][j]*(1-lx)*(ly);
+						nentries[la][detail-1] += (1-lx)*(ly);
+					}else{
+						avg[la-1][lb-1] += source[i][j]*(lx)*(ly);
+						nentries[la-1][lb-1] += (lx)*(ly);
+						
+						avg[la][lb-1] += source[i][j]*(1-lx)*(ly);
+						nentries[la][lb-1] += (1-lx)*(ly);
+					}
+				}
+
 			}
-		LayerViewer.show(Layer.getFreeLayer(ArrayOps.toDouble(nentries)), 512, true);
+		LayerViewer.show(Layer.getFreeLayer(nentries), 512, true);
 		for (int i = 0; i < detail; i++)
 			for (int j = 0; j < detail; j++)
 			{

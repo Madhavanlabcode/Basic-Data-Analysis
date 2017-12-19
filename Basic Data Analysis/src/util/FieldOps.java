@@ -2998,7 +2998,7 @@ public class FieldOps {
 	}
 	public static double[][][] reduce(int factor, double[][][] data)
 	{
-		double[][][] target = new double [data.length][data[0].length][2];
+		double[][][] target = new double [data.length/factor][data[0].length/factor][2];
 		for (int i = 0; i < target.length; i++)
 		for(int j = 0; j < target[0].length; j++)
 		{
@@ -3185,7 +3185,6 @@ public class FieldOps {
 	}
 	public static double[][] getGaussSmoothConvolve(double[][] data, double L)
 	{
-		int gl = (int)(3*(L+1));
 		int N = data.length;
 		int M = data[0].length;
 		double[][] smooth = new double[N][M];
@@ -3201,7 +3200,6 @@ public class FieldOps {
 					smooth[i][j] = 1.0d/(N*M);
 			return smooth;
 		}
-		double[][] gauss = new double [gl+1][gl+1];
 		
 		
 		for (int k = 0; k < N; k++)
