@@ -4152,9 +4152,10 @@ public class TopomapUtil {
 		}
 
 	}
-	public static void writeAverageSpectraAroundImps(Topomap t, double gaussradius, JFileChooser fc)
+	public static void writeAverageSpectraAroundImps(Topomap t, ArrayList<PointImp> impList, double gaussradius, JFileChooser fc)
 	{
-		PointImp[] imps = PointImp.readFromGaussSquareFile(FileOps.selectOpen(fc));
+		PointImp[] imps = new PointImp[1];
+		imps = impList.toArray(imps);
 		int nspec = imps.length;
 		double[][] averageSpec = new double [nspec][t.nlayers];
 		double[][] correlations = new double [nspec][t.nlayers];

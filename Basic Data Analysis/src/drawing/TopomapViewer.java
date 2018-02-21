@@ -998,7 +998,7 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
         mirrorLinecutMI.addActionListener(new mirrorLinecutAL(t));
         
         //Selection->how to mark a point
-        selectionMenu.add(new JMenuItem("Use 'm' key to mark a point in copied image"));
+        selectionMenu.add(new JMenuItem("Use 'm' key to mark a point"));
         
         //Selection->read a coordinates file and mark them
         JMenuItem loadImpsMI = new JMenuItem("Load a coodinates file and mark them");
@@ -1048,7 +1048,7 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
         		t=tPrime;
         	}
         	public void actionPerformed(ActionEvent e){
-        		TopomapUtil.writeAverageSpectraAroundImps(t, Double.parseDouble(JOptionPane.showInputDialog("Enter the gaussian radius in pixels")), fc);
+        		TopomapUtil.writeAverageSpectraAroundImps(t, imps, Double.parseDouble(JOptionPane.showInputDialog("Enter the gaussian radius in pixels")), fc);
         	}
         }
         saveAvgImpsMI.addActionListener(new saveAvgImpsAL(t));
@@ -2607,13 +2607,17 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
 		}
 		if (arg0.getKeyChar() == 'm') //mark a point
 		{
-			BufferedImage export = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
-			Graphics g = export.getGraphics();
-			refresh = true;
-			paint(g);
-			ImageEditing.drawPlus(export, ox + currenti*sizeratio, oy+currentj*sizeratio, 4, csh.getUnusedColor());
-			ImageEditing.copyToClipboard(ImageEditing.getSubset(export, ox, sx*sizeratio, oy, sy*sizeratio));
-
+			double[] coords = {currenti, currentj};
+			PointImp mark = new PointImp(coords);
+			if (imps == null && lc == null) {
+				imps = new ArrayList<PointImp>();
+				imps.add(mark);
+			}
+			else if(lc==null)
+				imps.add(mark);
+			
+			refresh=true;
+			repaint();
 		}
 		if (arg0.getKeyChar() == 'S' && imps == null)
 		{
@@ -3050,7 +3054,7 @@ public class TopomapViewer extends JFrame implements MouseListener, MouseMotionL
 			}
 			break;
 		case 8:
-			TopomapUtil.writeAverageSpectraAroundImps(t, Double.parseDouble(JOptionPane.showInputDialog("Enter the gaussian radius in pixels")), fc);
+			TopomapUtil.writeAverageSpectraAroundImps(t, imps, Double.parseDouble(JOptionPane.showInputDialog("Enter the gaussian radius in pixels")), fc);
 			break;
 		case 9:
 		{ 	boolean isDefault = JOptionPane.showConfirmDialog(null, "Use Default settings?") == JOptionPane.YES_OPTION;
