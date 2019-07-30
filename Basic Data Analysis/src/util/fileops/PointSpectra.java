@@ -285,6 +285,8 @@ public class PointSpectra {
 			return RHKFileOps.getPointSpectra(new File(path));
 		else if (path.endsWith(".asc"))
 			return NanonisFileOps.getFromASC(path);
+		else if (path.endsWith(".dat"))
+			return NanonisFileOps.getFromDat(path);
 		else;
 		return null;
 	}

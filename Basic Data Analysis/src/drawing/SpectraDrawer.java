@@ -9,7 +9,6 @@ import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 
 import analysis_gui.SpectraViewerTool;
-
 import util.ArrayOps;
 import util.Complex;
 import util.FieldOps;
@@ -166,6 +165,11 @@ public class SpectraDrawer implements KeyStrokeProccessor{
 //		if (ch == 'n') {
 //			this.changeNspec(Integer.parseInt(JOptionPane.showInputDialog("Enter the desired number of spectra")));
 //		}
+		if (ch == 'd'){//delete flat spectra
+			lastT = t.copy();
+			PointSpectra t = SpectraUtil.deleteFlatSpectra(this.t);
+			this.resetTotally(t);
+		}
 		if (ch == 'w')
 		{
 			this.dh = Double.parseDouble(JOptionPane.showInputDialog("Enter the desired offset in 'arbitrary units'."));
@@ -369,8 +373,8 @@ public class SpectraDrawer implements KeyStrokeProccessor{
 			System.out.println();
 			System.out.println();
 			System.out.println(Printer.arrayVertical(t.average));
+			Printer.copyToClipboard(Printer.arrayVertical(t.average));
 			setUpDrawer();
-			
 		}
 		if (ch == '.')
 		{
@@ -412,6 +416,7 @@ public class SpectraDrawer implements KeyStrokeProccessor{
 		System.out.print("" + ch + ' ');
 		
 	}
+	
 	private int[][] getFourierFilterBounds()
 	{
 		String input = JOptionPane.showInputDialog("Enter the frequencies you want to filter in the following form:\r\n" +

@@ -958,7 +958,7 @@ public class TopomapViewer_complex2 extends JFrame implements MouseListener, Mou
 			TopomapUtil.subtractPolynomialFitEachSpectrum(t, Integer.parseInt(JOptionPane.showInputDialog("Enter the degree of polynomial")));
 			break;
 		case 8:
-			TopomapUtil.writeAverageSpectraAroundImps(t, Double.parseDouble(JOptionPane.showInputDialog("Enter the gaussian radius in pixels")), fc);
+			TopomapUtil.writeAverageSpectraAroundLoadedImps(t, Double.parseDouble(JOptionPane.showInputDialog("Enter the gaussian radius in pixels")), fc);
 			break;
 		case 9:
 			Layer hist = TopomapUtil.getSpectralDistributionBasic(1, Integer.parseInt(JOptionPane.showInputDialog("Enter the number of bins.")), t);

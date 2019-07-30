@@ -791,6 +791,17 @@ public class NanonisFileOps {
 			}
 			if (headerLines.get(i).contains("DATA_INFO"))
 			{
+				//if we forgot to save the Scan parameters (we should NEVER do this)
+				//The nchannels will be the number of lines after DATA_INFO
+				if (nchannels == 0)
+				{
+					for(int k=0;k<headerLines.size()-i-1;k++){
+						if (headerLines.get(i+k).contains("both")){
+							nchannels++;
+						}
+					}
+					names = new String [nchannels*2];
+				}
 				for (int j = i+2; j < i+2+nchannels; j++)
 				{
 					tokens = headerLines.get(j).trim().split("\t");
@@ -799,13 +810,7 @@ public class NanonisFileOps {
 				}
 			}
 		}
-		
-		//if we forgot to save the Scan parameters (we should NEVER do this)
-		//The nchannels will be the number of lines after DATA_INFO
-		if (nchannels == 0)
-		{
-			
-		}
+
 		double[] x = ArrayOps.generateArrayInclBoth(cx-lx/2, cx+lx/2, nx);
 		double[] y = ArrayOps.generateArrayInclBoth(cy+ly/2, cy-ly/2, ny);
 		double[][][] dataset = new double [nchannels*2][nx][ny];
@@ -1026,6 +1031,17 @@ public class NanonisFileOps {
 			}
 			if (headerLines.get(i).contains("DATA_INFO"))
 			{
+				//if we forgot to save the Scan parameters (we should NEVER do this)
+				//The nchannels will be the number of lines after DATA_INFO
+				if (nchannels == 0)
+				{
+					for(int k=0;k<headerLines.size()-i-1;k++){
+						if (headerLines.get(i+k).contains("both")){
+							nchannels++;
+						}
+					}
+					names = new String [nchannels*2];
+				}
 				for (int j = i+2; j < i+2+nchannels; j++)
 				{
 					tokens = headerLines.get(j).trim().split("\t");
@@ -1146,6 +1162,17 @@ public class NanonisFileOps {
 			}
 			if (headerLines.get(i).contains("DATA_INFO"))
 			{
+				//if we forgot to save the Scan parameters (we should NEVER do this)
+				//The nchannels will be the number of lines after DATA_INFO
+				if (nchannels == 0)
+				{
+					for(int k=0;k<headerLines.size()-i-1;k++){
+						if (headerLines.get(i+k).contains("both")){
+							nchannels++;
+						}
+					}
+					names = new String [nchannels*2];
+				}
 				for (int j = i+2; j < i+2+nchannels; j++)
 				{
 					tokens = headerLines.get(j).trim().split("\t");
@@ -1968,6 +1995,7 @@ public class NanonisFileOps {
 		char exp = 0;
 		if (headerLines.get(0).contains("bias spectroscopy")) exp = 'b';
 		else if (headerLines.get(0).contains("Z spectroscopy")) exp = 'z';
+		System.out.println("exp = " + exp);
 		for (int i = 0; i < headerLines.size(); i++)
 		{
 			if (headerLines.get(i).startsWith("X (m)"))
@@ -2017,30 +2045,29 @@ public class NanonisFileOps {
 		double[] v = new double [npts];
 		//To assign the voltage we must pick the "Bias from Adder column"
 		//NOTE this is only true on the Nanonis system with external adder
-		int biasI = -1;
+		int biasI = 0;
 		for (int i = 0; i < dataColumns.length; i++)
 			if (exp == 'b' && dataColumns[i].contains("from") && (nspec == 1 || dataColumns[i].contains("[AVG]")))
 					biasI = i;
 		
-		if (exp == 'z') biasI = 0;
-			
 		ArrayList<Integer> dataIndices = new ArrayList<Integer>();
 		if (exp == 'b')
 			for (int i = 0; i < dataColumns.length; i++)
-				if (dataColumns[i].contains("Lockin X") && (nspec == 1 || (dataColumns[i].contains("[") && dataColumns[i].contains("]") && !dataColumns[i].contains("AVG"))))
+				if ((dataColumns[i].contains("Lockin X") || dataColumns[i].contains("LockinX")) && (nspec == 1 || (dataColumns[i].contains("[") && dataColumns[i].contains("]") && !dataColumns[i].contains("AVG"))))
 					dataIndices.add(i);
 		
 		if (exp == 'z')
 			for (int i = 0; i < dataColumns.length; i++)
 				if (dataColumns[i].contains("Current") && (nspec == 1 || (dataColumns[i].contains("[") && dataColumns[i].contains("]") && !dataColumns[i].contains("AVG"))))
 					dataIndices.add(i);
-		System.out.println(filepath);
+		
 		double[][] data = new double [nspec][npts];
-		for (int i = 0; i < nspec; i++)
-			for (int j = 0; j < npts; j++)
-			{
-				data[i][j] = Double.parseDouble(dataMatrix[j][dataIndices.get(i)]);
-			}
+		if(dataIndices.size()>0)
+			for (int i = 0; i < nspec; i++)
+				for (int j = 0; j < npts; j++)
+				{
+					data[i][j] = Double.parseDouble(dataMatrix[j][dataIndices.get(i)]);
+				}
 		
 		for (int i = 0; i < npts; i++)
 			v[i] = Double.parseDouble(dataMatrix[i][biasI]);

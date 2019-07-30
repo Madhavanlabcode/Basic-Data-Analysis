@@ -4193,6 +4193,46 @@ public class TopomapUtil {
 		ColumnIO.writeLines(corr.toTextTable(), f.toString() + "corr.txt");
 	}
 	
+	public static void writeAverageSpectraAroundLoadedImps(Topomap t, double gaussradius, JFileChooser fc)
+	{
+		PointImp[] imps = PointImp.readFromGaussSquareFile(FileOps.selectOpen(fc));
+		int nspec = imps.length;
+		double[][] averageSpec = new double [nspec][t.nlayers];
+		double[][] correlations = new double [nspec][t.nlayers];
+		double[][] map = new double [t.nx][t.ny];
+		double[][] pixelWeight = ImpurityUtil.getPixelWeight(t.nx, t.ny, gaussradius);
+		for (int i = 0; i < imps.length; i++)
+		{
+			System.out.println(i);
+			map = ImpurityUtil.makeImpurityGaussMaskNormal(imps, t.nx, t.ny, gaussradius, pixelWeight, i);
+			for (int j = 0; j < t.nlayers; j++)
+			{
+				averageSpec[i][j] = FieldOps.innerProduct(map, t.data[j]);
+				correlations[i][j] = FieldOps.correlation(map, t.data[j]);
+			}
+		}
+		
+		double[] x = new double [nspec];
+		double[] y = new double [nspec];
+		for (int i = 0; i < nspec; i++)
+		{
+			x[i] = imps[i].pixelPos[0];
+			y[i] = imps[i].pixelPos[1];
+		}
+		PointSpectra average = new PointSpectra(averageSpec, t.v, x, y);
+		PointSpectra corr = new PointSpectra(correlations, t.v, x, y);
+		
+		File f = FileOps.selectSave(fc);
+		
+		PointSpectra.writeBIN(average, f.toString() + "average.bin");
+		PointSpectra.writeBIN(corr, f.toString() + "corr.bin");
+		new SpectraDrawer(average, null);
+		new SpectraDrawer(corr, null);
+		
+		ColumnIO.writeLines(average.toTextTable(), f.toString() + "average.txt");
+		ColumnIO.writeLines(corr.toTextTable(), f.toString() + "corr.txt");
+	}
+	
 	public static Layer sumOneDimension(Topomap t, int dimension)
 	{
 		if (dimension == 0)

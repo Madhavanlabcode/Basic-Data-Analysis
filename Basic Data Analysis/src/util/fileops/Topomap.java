@@ -349,6 +349,7 @@ public class Topomap extends MapRectCoordSystem{
 	public static Topomap open(JFileChooser fc)
 	{
 		if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION)
+			System.out.println("Opening topomap " + fc.getSelectedFile().toString());
 			if (fc.getSelectedFile().toString().endsWith(".bin"))
 				return Topomap.readBIN(fc.getSelectedFile().toString());
 			else if (fc.getSelectedFile().toString().endsWith(".txt"))

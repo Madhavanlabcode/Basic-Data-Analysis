@@ -40,7 +40,6 @@ import main.SRAW;
 import util.ArrayOps;
 import util.color.ColorScale;
 import util.color.ColorScales;
-
 import util.robot.Robo;
 
 
@@ -85,16 +84,11 @@ public class MultiFileViewer {
 	public void populateFiles(String dir)
 	{
 		sf = 0;
-		System.out.println(dir);
-		files = new File(dir).listFiles();
 		
-		if(files == null)
-		{
-			JOptionPane.showMessageDialog(null, "Choose folder with Nanonis files");
-			fco.showSaveDialog(null);
-			files = new File(fco.getCurrentDirectory().toString()).listFiles();
-		}
-		
+		JOptionPane.showMessageDialog(null, "Choose folder with Nanonis files");
+		fco.showSaveDialog(null);
+		files = new File(fco.getCurrentDirectory().toString()).listFiles();
+
 		int n = 0;
 		int m = 0;
 		for (int i = 0; i < files.length; i++)
@@ -234,6 +228,17 @@ public class MultiFileViewer {
 	        	public void actionPerformed(ActionEvent e){rob.typeChar('o');}
 	        }
 	        spawnViewMI.addActionListener(new spawnViewAL(rob));
+	        
+	        //Actions->Span a viewer that tries to correct voltage drift in a dIdV map
+		    JMenuItem autoZeroMI = new JMenuItem("Try to auto-zero selected dIdV map");
+		    fileMenu.add(autoZeroMI);
+	        class autoZeroAL implements ActionListener{
+	        	autoZeroAL(){}
+	        	public void actionPerformed(ActionEvent e){
+	        		autoZero();
+	        	}
+	        }
+	        autoZeroMI.addActionListener(new autoZeroAL());
 		    
 	        //Selection Menu
 	        JMenu selectMenu = new JMenu("Selection");
@@ -413,6 +418,138 @@ public class MultiFileViewer {
 			Layer[] m = NanonisFileOps.loadLayerFromScan(everything[sf].f.toString(), true);
 			lv = new LayerViewer(m[o], Topomap.stddir, 1024);
 			lv.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		}
+	}
+	
+	public void autoZero(){
+		// Spawns a viewer of a selected collection of spectra, where everything has been shifted to correct for voltage drift.
+		String name = everything[sf].f.getName();
+		String nameMessage = "";
+		if (name.endsWith(".3ds"))
+		{
+			String[] theNames = NanonisFileOps.getLayerNamesFrom3ds(everything[sf].f.toString());
+			for (int i = 0; i < theNames.length; i++)
+				nameMessage += "" + (i+1) + " - " + theNames[i] + "\r\n";
+			int o = Integer.parseInt(JOptionPane.showInputDialog("What channel (typically I) do you zero based on?\r\n" + nameMessage).trim());
+			int c = Integer.parseInt(JOptionPane.showInputDialog("What zeroed data do you want to view?\r\n" + nameMessage).trim());
+			
+			Topomap[] m = NanonisFileOps.loadTopomapFrom3ds(everything[sf].f.toString());
+			
+			int[][] offsetMap=new int[m[o-1].nx][m[o-1].ny];
+			//initialize to zeroes
+			for(int x=0;x<m[o-1].nx;x++){
+				for(int y=0;y<m[o-1].ny;y++){
+					offsetMap[x][y]=0;
+				}
+			}
+			
+			int lIndex=0;
+			int center=0;
+			boolean centerPos;
+			
+			//Find the point where v=0
+			boolean startPos;
+			if(m[o-1].v[0]>0)
+				startPos=true;
+			else
+				startPos=false;
+			
+			
+			while(m[o-1].v[lIndex]>0==startPos){
+				center=lIndex;
+				lIndex++;
+			}
+			
+			
+			if(center==0){
+				System.out.println("no zero crossing found");
+				return;
+			}
+			
+			//track largest offsets
+			int largestOffset=0;
+			int smallestOffset=0;
+			//Go through the topomap of current, find the point closest to v=0 where current crosses from negative to positive, store in offsetMap
+			for(int x=0;x<m[o-1].nx;x++){
+				for(int y=0;y<m[o-1].ny;y++){
+					lIndex=0;
+					centerPos=m[o-1].data[center][x][y]>0;
+					
+					while(m[o-1].data[center+lIndex][x][y]>0==centerPos){
+						if(lIndex==-m[o-1].nlayers/2+1){
+							System.out.println("no zero found at " + x + ", " + y);
+							centerPos=!centerPos;
+							lIndex=0;
+						}else if(lIndex>=0){
+							//check point further up for flip, then go negative -1
+							if(m[o-1].data[center+lIndex+1][x][y]>0==!centerPos){
+								offsetMap[x][y]=lIndex;
+								if(lIndex>largestOffset)
+									largestOffset=lIndex;
+								
+								lIndex++;
+							}else{
+								lIndex=-lIndex-1;
+							}
+						}else{
+							//check point further down for flip, then go positive
+							if(m[o-1].data[center+lIndex-1][x][y]>0==!centerPos){
+								offsetMap[x][y]=lIndex;
+								if(lIndex<smallestOffset)
+									smallestOffset=lIndex;
+								lIndex--;
+							}else{
+								lIndex=-lIndex;
+							}
+						}
+					}
+				}
+			}
+			
+			//create a new dataset from choice c-1 by expanding by largestOffset on the negative side and smallestOffset on the positive side
+			double[][][] newData= new double[m[c-1].nlayers+largestOffset+smallestOffset][m[c-1].nx][m[c-1].ny];
+			
+			for(int x=0;x<m[o-1].nx;x++){
+				for(int y=0;y<m[o-1].ny;y++){
+					for(int z=0;z<m[c-1].nlayers+largestOffset+smallestOffset;z++){
+						//larger offsetMap values get pushed further negative
+						if(z<largestOffset-offsetMap[x][y]){
+							newData[z][x][y]=m[c-1].data[0][x][y];
+						}else if(z>=largestOffset-offsetMap[x][y]+m[c-1].nlayers){
+							newData[z][x][y]=m[c-1].data[m[c-1].nlayers-1][x][y];
+						}else{
+							newData[z][x][y]=m[c-1].data[z-largestOffset+offsetMap[x][y]][x][y];
+						}
+					}
+				}
+			}
+			
+			//correct v
+			double dv = m[c-1].v[1]-m[c-1].v[0];
+			double[] newV = new double[m[c-1].nlayers+largestOffset+smallestOffset];
+			for(int z=0;z<m[c-1].nlayers+largestOffset+smallestOffset;z++){
+				if(z<largestOffset){
+					newV[z]=m[c-1].v[0]-(largestOffset-z)*dv;
+				}else if(z>=largestOffset+m[c-1].nlayers){
+					newV[z]=m[c-1].v[m[c-1].nlayers-1]+(m[c-1].nlayers+largestOffset+smallestOffset-z)*dv;
+				}else{
+					newV[z]=m[c-1].v[z-largestOffset];
+				}
+			}
+			
+			//correct the topomap and spawn the viewer
+			
+			Topomap newT = new Topomap(newData, newV, m[c-1].x, m[c-1].y, null);
+			mv = new TopomapViewer(newT, Topomap.stddir, 512);
+			mv.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+			if (theNames[c-1].contains("X"))
+				mv.setName("lockin");
+			else
+				mv.setName(theNames[o-1]);
+		}
+		if (name.endsWith(".sxm"))
+		{
+			JOptionPane.showMessageDialog(null, "Select a dIdV map");
 		}
 	}
 	

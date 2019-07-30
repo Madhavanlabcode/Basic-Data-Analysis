@@ -28,6 +28,40 @@ public class SpectraUtil {
 	
 	static JFileChooser fc;
 	
+	public static PointSpectra deleteFlatSpectra(PointSpectra t){
+		//deletes spectra whose endpoints and center point are all the same
+		boolean[] isFlat = new boolean[t.nspec];
+		int nFlat = 0;
+		
+		for(int x=t.nspec;x>0;x--){
+			if(t.data[x-1][0]==t.data[x-1][t.nlayers-1] && t.data[x-1][0]==t.data[x-1][t.nlayers/2]){
+				isFlat[x-1]=true;
+				nFlat++;
+			}else{
+				isFlat[x-1]=false;
+			}
+		}
+		System.out.println(nFlat + " flat spectra.");
+		
+		double[] x = new double [t.nspec-nFlat];
+		double[] y = new double [t.nspec-nFlat];
+		double[][] data = new double[t.nspec-nFlat][t.nlayers];
+		
+		int nSkipped=0;
+		for (int j = 0; j < t.nspec; j++){
+			if (!isFlat[j]){
+				x[j-nSkipped] = t.x[j];
+				y[j-nSkipped] = t.y[j];
+				for (int k = 0; k < t.nlayers; k++)
+					data[j-nSkipped][k] = t.data[j][k];
+			}else{
+				nSkipped++;
+			}
+		}
+
+		return new PointSpectra(data, t.v, x, y);
+	}
+	
 	//cuts off the extreme voltages from a PointSpectra object.
 	public static PointSpectra truncate(PointSpectra data, double min, double max, boolean specFlipped)
 	{
