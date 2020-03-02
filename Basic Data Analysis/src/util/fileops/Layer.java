@@ -349,6 +349,7 @@ public class Layer  extends MapRectCoordSystem{
 	}
 	public static Layer openFree(File fullpath)
 	{
+			System.out.println("opening Layer " + fullpath.toString());
 			if (fullpath.toString().endsWith(".bin"))
 				return Layer.readBIN(fullpath.toString());
 			else if (fullpath.toString().endsWith(".txt"))

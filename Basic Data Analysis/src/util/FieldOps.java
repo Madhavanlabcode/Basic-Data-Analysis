@@ -6104,6 +6104,21 @@ public class FieldOps {
 			}
 		return  ans;
 	}
+	
+	public static double[][] spatialFilterZeros(double[][] data, double[][] weight)
+	{
+		double mean = 0;
+		int nx = data.length, ny = data[0].length;
+		double[][] ans = new double[nx][ny];
+		System.out.println(mean);
+		for (int j = 0; j < nx; j++)
+			for (int k = 0; k < ny; k++)
+			{
+				ans[j][k] = weight[j][k]*data[j][k] + (1-weight[j][k])*mean;
+			}
+		return  ans;
+	}
+	
 	public static void putAllTrues(boolean[][][] fftfilt, boolean[][] totalfilt) {
 		for (int i = 0; i < totalfilt.length; i++)
 			for (int j = 0; j < totalfilt.length; j++)

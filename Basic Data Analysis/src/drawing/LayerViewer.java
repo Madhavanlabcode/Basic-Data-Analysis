@@ -147,8 +147,8 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 	TwoDGaussianFreeFitter fitter = null;
 	public LayerViewer(Layer inLayer, String inDir, int size)
 	{
+		
 		t = inLayer;
-		System.out.println(FieldOps.mean(t.data) + "\t" + t.nx + "\t" + t.ny);
 //		this.dir = dir;
 		if (fc != null)
 			dir = fc.getCurrentDirectory().toString() + "\\";
@@ -170,6 +170,7 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 		N = t.nx;
 		sx = N;
 		drawField = t.data;
+		
 		while (drawField.length > defaultSize && drawField.length/2 >= defaultSize)
 		{
 			this.drawField = FieldOps.reduce(2, this.drawField);
@@ -2120,8 +2121,8 @@ public class LayerViewer extends JFrame implements MouseListener, MouseMotionLis
 		java.awt.Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 		int makeWindowSmaller=0;
 		int largerDim= Math.max(t.nx,t.ny);
-		int scalefactor= (int)(screenSize.getHeight()/largerDim) - makeWindowSmaller;
-		int sizechoice = largerDim*scalefactor;
+		float scalefactor = (float)screenSize.getHeight()/largerDim - makeWindowSmaller;
+		int sizechoice = (int)(largerDim*scalefactor);
 		new LayerViewer(t, Topomap.stddir, sizechoice);
 	}
 	

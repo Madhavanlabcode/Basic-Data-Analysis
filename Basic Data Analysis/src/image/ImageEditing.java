@@ -546,7 +546,7 @@ public class ImageEditing {
 	public static double[][] getFromImage(BufferedImage im){
 		double[][] ans = new double [im.getWidth()][im.getHeight()];
 		Color c;
-		int r, g, b;
+		double r, g, b;
 		for (int i = 0; i < ans.length; i++)
 			for (int j = 0; j < ans[0].length; j++)
 			{
@@ -554,7 +554,7 @@ public class ImageEditing {
 				r = c.getRed();
 				g = c.getGreen();
 				b = c.getBlue();
-				ans[i][j] = r+g+b;
+				ans[i][j] = (r+g+b)/765;
 			}
 		
 	return ans;

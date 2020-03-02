@@ -12,9 +12,16 @@ public class PointImp {
 
 	public double[] pixelPos;
 	
-	public PointImp(double[] pixelPos) {
+	public PointImp(double[] inputPos) {
 		super();
-		this.pixelPos = pixelPos;
+		pixelPos = inputPos;
+	}
+	
+	public boolean equals(PointImp b){
+		if(b.pixelPos[0]==this.pixelPos[0]&&b.pixelPos[1]==this.pixelPos[1])
+			return true;
+		else
+			return false;
 	}
 	
 	public static PointImp[] readFromGaussSquareFile(java.io.File f)

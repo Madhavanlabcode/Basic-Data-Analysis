@@ -2508,7 +2508,7 @@ public class DriftCorrectionMethods {
 			{
 				Topomap map = Topomap.open(doer.fc);
 				File save = FileOps.selectSave(doer.fc);
-				int secEstimate = (int)(Math.pow(doer.t.nx/192.0, 4) * 1 * FANCY_TIME_192x192);
+				int secEstimate = (int)(Math.pow(map.nx/192.0, 4) * 1 * FANCY_TIME_192x192);
 				boolean fancy = JOptionPane.showConfirmDialog(null, "Attempt fancy application of the u-field?\r\nFancy way estimated to take " + (secEstimate/60) + " minutes per layer.") == JOptionPane.YES_OPTION;
 				Topomap done = TopomapUtil.applyUField(u, map);
 				Topomap.writeBIN(done, save.toString());
